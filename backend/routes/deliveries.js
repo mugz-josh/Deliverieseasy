@@ -1,51 +1,46 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const pool = require('../db');
 
 const router = express.Router();
-const db = new sqlite3.Database('./deliveries.db');
 
 // Get all deliveries
-router.get('/', (req, res) => {
-  db.all(`
-    SELECT d.*, u.name as customer_name, u.phone as customer_phone
-    FROM deliveries d
-    LEFT JOIN users u ON d.customer_id = u.id
-    ORDER BY d.created_at DESC
-  `, [], (err, rows) => {
-    if (err) {
-      console.error('Get deliveries error:', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Server error'
-      });
-    }
+router.get('/', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT d.*, u.name as customer_name, u.phone as customer_phone
+      FROM deliveries d
+      LEFT JOIN users u ON d.customer_id = u.id
+      ORDER BY d.created_at DESC
+    `);
 
     res.json({
       success: true,
-      data: rows
+      data: result.rows
     });
-  });
+  } catch (err) {
+    console.error('Get deliveries error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 });
 
 // Get delivery by ID
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
-  db.get(`
-    SELECT d.*, u.name as customer_name, u.phone as customer_phone,
-           r.name as rider_name, r.phone as rider_phone
-    FROM deliveries d
-    LEFT JOIN users u ON d.customer_id = u.id
-    LEFT JOIN users r ON d.rider_id = r.id
-    WHERE d.id = ?
-  `, [id], (err, row) => {
-    if (err) {
-      console.error('Get delivery error:', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Server error'
-      });
-    }
+  try {
+    const result = await pool.query(`
+      SELECT d.*, u.name as customer_name, u.phone as customer_phone,
+             r.name as rider_name, r.phone as rider_phone
+      FROM deliveries d
+      LEFT JOIN users u ON d.customer_id = u.id
+      LEFT JOIN users r ON d.rider_id = r.id
+      WHERE d.id = $1
+    `, [id]);
+
+    const row = result.rows[0];
 
     if (!row) {
       return res.status(404).json({
@@ -58,11 +53,17 @@ router.get('/:id', (req, res) => {
       success: true,
       data: row
     });
-  });
+  } catch (err) {
+    console.error('Get delivery error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 });
 
 // Create new delivery
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const {
     customer_id,
     pickup_address,
@@ -81,46 +82,28 @@ router.post('/', (req, res) => {
     });
   }
 
-  const sql = `
-    INSERT INTO deliveries (
-      customer_id, pickup_address, delivery_address,
-      package_description, package_weight, delivery_fee,
-      payment_method, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
-  `;
+  try {
+    const result = await pool.query(`
+      INSERT INTO deliveries (
+        customer_id, pickup_address, delivery_address,
+        package_description, package_weight, delivery_fee,
+        payment_method, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+      RETURNING *
+    `, [customer_id, pickup_address, delivery_address, package_description, package_weight, delivery_fee, payment_method]);
 
-  const params = [
-    customer_id, pickup_address, delivery_address,
-    package_description, package_weight || null, delivery_fee || null,
-    payment_method
-  ];
-
-  db.run(sql, params, function(err) {
-    if (err) {
-      console.error('Create delivery error:', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Server error'
-      });
-    }
-
-    // Get the created delivery
-    db.get('SELECT * FROM deliveries WHERE id = ?', [this.lastID], (err, row) => {
-      if (err) {
-        console.error('Get created delivery error:', err);
-        return res.status(500).json({
-          success: false,
-          message: 'Server error'
-        });
-      }
-
-      res.status(201).json({
-        success: true,
-        message: 'Delivery created successfully',
-        data: row
-      });
+    res.status(201).json({
+      success: true,
+      message: 'Delivery created successfully',
+      data: result.rows[0]
     });
-  });
+  } catch (err) {
+    console.error('Create delivery error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 });
 
 // Update delivery status
@@ -173,7 +156,7 @@ router.put('/:id/status', async (req, res) => {
 });
 
 // Update delivery location (for tracking)
-router.put('/:id/location', (req, res) => {
+router.put('/:id/location', async (req, res) => {
   const { id } = req.params;
   const { latitude, longitude } = req.body;
 
@@ -184,45 +167,33 @@ router.put('/:id/location', (req, res) => {
     });
   }
 
-  const sql = `
-    UPDATE deliveries
-    SET current_location_lat = ?, current_location_lng = ?, updated_at = datetime("now")
-    WHERE id = ?
-  `;
+  try {
+    const result = await pool.query(`
+      UPDATE deliveries
+      SET current_location_lat = $1, current_location_lng = $2, updated_at = NOW()
+      WHERE id = $3
+      RETURNING *
+    `, [latitude, longitude, id]);
 
-  db.run(sql, [latitude, longitude, id], function(err) {
-    if (err) {
-      console.error('Update location error:', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Server error'
-      });
-    }
-
-    if (this.changes === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Delivery not found'
       });
     }
 
-    // Get the updated delivery
-    db.get('SELECT * FROM deliveries WHERE id = ?', [id], (err, row) => {
-      if (err) {
-        console.error('Get updated delivery error:', err);
-        return res.status(500).json({
-          success: false,
-          message: 'Server error'
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Location updated',
-        data: row
-      });
+    res.json({
+      success: true,
+      message: 'Location updated',
+      data: result.rows[0]
     });
-  });
+  } catch (err) {
+    console.error('Update location error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 });
 
 module.exports = router;

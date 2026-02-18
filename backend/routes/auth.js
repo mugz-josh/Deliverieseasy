@@ -1,10 +1,9 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const sqlite3 = require('sqlite3').verbose();
+const pool = require('../db');
 
 const router = express.Router();
-const db = new sqlite3.Database('./deliveries.db');
 
 // Register new user
 router.post('/register', async (req, res) => {
@@ -46,7 +45,7 @@ router.post('/register', async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: newUser.rows[0].id, role: newUser.rows[0].role },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: process.env.JWT_EXPIRE || '7d' }
     );
 
@@ -69,30 +68,26 @@ router.post('/register', async (req, res) => {
 });
 
 // Login user
-router.post('/login', (req, res) => {
-  const { email, password } = req.body;
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-  // Validate required fields
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email and password are required'
-    });
-  }
-
-  // Find user
-  db.get(`
-    SELECT id, name, email, phone, password_hash, role, created_at
-    FROM users
-    WHERE email = ?
-  `, [email], (err, user) => {
-    if (err) {
-      console.error('Find user error:', err);
-      return res.status(500).json({
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({
         success: false,
-        message: 'Server error'
+        message: 'Email and password are required'
       });
     }
+
+    // Find user
+    const result = await pool.query(`
+      SELECT id, name, email, phone, password_hash, role, created_at
+      FROM users
+      WHERE email = $1
+    `, [email]);
+
+    const user = result.rows[0];
 
     if (!user) {
       return res.status(401).json({
@@ -102,42 +97,40 @@ router.post('/login', (req, res) => {
     }
 
     // Check password
-    bcrypt.compare(password, user.password_hash, (err, isValidPassword) => {
-      if (err) {
-        console.error('Password compare error:', err);
-        return res.status(500).json({
-          success: false,
-          message: 'Server error'
-        });
-      }
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
-      if (!isValidPassword) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials'
-        });
-      }
-
-      // Generate JWT token
-      const token = jwt.sign(
-        { userId: user.id, role: user.role },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '7d' }
-      );
-
-      // Remove password hash from response
-      const { password_hash, ...userData } = user;
-
-      res.json({
-        success: true,
-        message: 'Login successful',
-        data: {
-          user: userData,
-          token
-        }
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
       });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id, role: user.role },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    // Remove password hash from response
+    const { password_hash, ...userData } = user;
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: userData,
+        token
+      }
     });
-  });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 });
 
 // Get current user profile

@@ -1,13 +1,12 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const pool = require('../db');
 
 const router = express.Router();
-const db = new sqlite3.Database('./deliveries.db');
 
 // Get all users (admin only)
 router.get('/', async (req, res) => {
   try {
-    const users = await pool.query(`
+    const result = await pool.query(`
       SELECT id, name, email, phone, role, created_at, updated_at
       FROM users
       ORDER BY created_at DESC
@@ -15,7 +14,7 @@ router.get('/', async (req, res) => {
 
     res.json({
       success: true,
-      data: users.rows
+      data: result.rows
     });
   } catch (error) {
     console.error('Get users error:', error);
@@ -27,21 +26,17 @@ router.get('/', async (req, res) => {
 });
 
 // Get user by ID
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
-  db.get(`
-    SELECT id, name, email, phone, role, created_at, updated_at
-    FROM users
-    WHERE id = ?
-  `, [id], (err, row) => {
-    if (err) {
-      console.error('Get user error:', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Server error'
-      });
-    }
+  try {
+    const result = await pool.query(`
+      SELECT id, name, email, phone, role, created_at, updated_at
+      FROM users
+      WHERE id = $1
+    `, [id]);
+
+    const row = result.rows[0];
 
     if (!row) {
       return res.status(404).json({
@@ -54,30 +49,36 @@ router.get('/:id', (req, res) => {
       success: true,
       data: row
     });
-  });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 });
 
 // Get riders (for assignment)
-router.get('/riders/active', (req, res) => {
-  db.all(`
-    SELECT id, name, email, phone
-    FROM users
-    WHERE role = 'rider'
-    ORDER BY name
-  `, [], (err, rows) => {
-    if (err) {
-      console.error('Get riders error:', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Server error'
-      });
-    }
+router.get('/riders/active', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name, email, phone
+      FROM users
+      WHERE role = 'rider'
+      ORDER BY name
+    `);
 
     res.json({
       success: true,
-      data: rows
+      data: result.rows
     });
-  });
+  } catch (error) {
+    console.error('Get riders error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 });
 
 // Update user role (admin only)
