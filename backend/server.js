@@ -25,7 +25,8 @@ app.use(cors({
       'https://deliveries-app-v1o9.vercel.app',
       'https://deliveries-app.vercel.app',
       'https://safe-app-woad.vercel.app',
-      'https://safe-powmb9asg-mugisha-joshuas-projects.vercel.app'
+      'https://safe-powmb9asg-mugisha-joshuas-projects.vercel.app',
+      'https://safe-cbzxpy50p-mugisha-joshuas-projects.vercel.app'
     ];
     
     if (allowedOrigins.indexOf(origin) !== -1) {
