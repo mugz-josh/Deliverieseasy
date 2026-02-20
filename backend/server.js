@@ -195,6 +195,7 @@ app.get('/api/db-status', async (req, res) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/bookings', require('./routes/bookings'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
