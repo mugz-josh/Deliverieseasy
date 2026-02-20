@@ -197,6 +197,13 @@ app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/bookings', require('./routes/bookings'));
 
+// Test email endpoint
+app.get('/api/test-email', async (req, res) => {
+  const { sendBookingConfirmationEmail } = require('./emailService');
+  const result = await sendBookingConfirmationEmail('joshua.mugisha.upti@gmail.com', 'Test User', 'Express Delivery', 999);
+  res.json(result);
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
