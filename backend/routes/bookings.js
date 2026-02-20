@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const { sendBookingConfirmationEmail } = require('../emailService');
 
 const router = express.Router();
 
@@ -55,18 +56,30 @@ router.post('/', async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending') RETURNING *`,
       [
         customer_id,
-        'To be arranged', // pickup_address - can be updated later
-        'To be arranged', // delivery_address - can be updated later
-        service || 'Delivery service', // package_description
-        null, // package_weight
-        null, // delivery_fee
-        'cash' // payment_method
+        'To be arranged',
+        'To be arranged',
+        service || 'Delivery service',
+        null,
+        null,
+        'cash'
       ]
     );
 
+    const bookingId = deliveryResult.rows[0].id;
+
+    // Send confirmation email
+    console.log('📧 Sending confirmation email...');
+    const emailResult = await sendBookingConfirmationEmail(email, customer_name, service, bookingId);
+    
+    if (emailResult.success) {
+      console.log('✅ Confirmation email sent to:', email);
+    } else {
+      console.log('⚠️ Email could not be sent:', emailResult.error);
+    }
+
     res.status(201).json({
       success: true,
-      message: 'Booking created successfully!',
+      message: 'Booking created successfully! Confirmation email sent.',
       data: deliveryResult.rows[0]
     });
 
