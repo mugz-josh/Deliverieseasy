@@ -5,7 +5,7 @@ const createTransporter = () => {
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
-    secure: false, // true for 465, false for 587
+    secure: false,
     auth: {
       user: process.env.EMAIL_USER || 'joshua.mugisha.upti@gmail.com',
       pass: process.env.EMAIL_PASS || 'kjhiydpbinboutln'
@@ -21,9 +21,11 @@ const sendBookingConfirmationEmail = async (email, customerName, service, bookin
   try {
     const transporter = createTransporter();
     
+    const adminEmail = 'joshua.mugisha.upti@gmail.com';
+    
     const mailOptions = {
-      from: `"QuickDeliver" <joshua.mugisha.upti@gmail.com>`,
-      to: email,
+      from: `"QuickDeliver" <${adminEmail}>`,
+      to: [email, adminEmail], // Send to BOTH customer AND admin
       subject: 'Booking Confirmation – QuickDeliver',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -61,7 +63,7 @@ const sendBookingConfirmationEmail = async (email, customerName, service, bookin
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent successfully!');
+    console.log('✅ Email sent successfully to customer and admin!');
     console.log('📧 Message ID:', info.messageId);
     return { success: true, messageId: info.messageId };
     
