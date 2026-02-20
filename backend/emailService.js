@@ -2,13 +2,20 @@ const nodemailer = require('nodemailer');
 
 // Create transporter for sending emails using Gmail SMTP
 const createTransporter = () => {
+  const emailUser = process.env.EMAIL_USER || 'joshua.mugisha.upti@gmail.com';
+  const emailPass = process.env.EMAIL_PASS || 'kjhiydpbinboutln';
+  
+  console.log('📧 Email Config:');
+  console.log('   User:', emailUser);
+  console.log('   Pass length:', emailPass ? emailPass.length : 0);
+  
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
     secure: false,
     auth: {
-      user: process.env.EMAIL_USER || 'joshua.mugisha.upti@gmail.com',
-      pass: process.env.EMAIL_PASS || 'kjhiydpbinboutln'
+      user: emailUser,
+      pass: emailPass
     },
     tls: {
       rejectUnauthorized: false
@@ -25,7 +32,7 @@ const sendBookingConfirmationEmail = async (email, customerName, service, bookin
     
     const mailOptions = {
       from: `"QuickDeliver" <${adminEmail}>`,
-      to: [email, adminEmail], // Send to BOTH customer AND admin
+      to: [email, adminEmail],
       subject: 'Booking Confirmation – QuickDeliver',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -47,28 +54,25 @@ const sendBookingConfirmationEmail = async (email, customerName, service, bookin
             
             <p style="font-size: 14px; color: #666;">Our team will contact you shortly to confirm pickup and delivery details.</p>
             
-            <p style="font-size: 14px; color: #666;">If you have any questions, please don't hesitate to contact us.</p>
-            
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
               <p style="font-size: 14px; color: #888; margin: 0;">Best regards,</p>
               <p style="font-size: 16px; color: #667eea; font-weight: bold; margin: 5px 0;">The QuickDeliver Team</p>
             </div>
           </div>
-          
-          <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
-            <p>This is an automated message. Please do not reply to this email.</p>
-          </div>
         </div>
       `
     };
 
+    console.log('📧 Sending email to:', mailOptions.to);
+    
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent successfully to customer and admin!');
+    console.log('✅ Email sent successfully!');
     console.log('📧 Message ID:', info.messageId);
     return { success: true, messageId: info.messageId };
     
   } catch (error) {
-    console.error('❌ Error sending email:', error.message);
+    console.error('❌ Email Error Details:', error.message);
+    console.error('❌ Full error:', error);
     return { success: false, error: error.message };
   }
 };
