@@ -37,15 +37,15 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(morgan('combined')); // Logging
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use(morgan('combined'));
+app.use(express.json()); 
+app.use(express.urlencoded({ extended: true })); 
 
-// Parse DATABASE_URL to extract connection parameters
-// Format: postgres://username:password@host:port/database or postgresql://username:password@host/database (Neon format)
+
+
 function parseDatabaseUrl(url) {
   try {
-    // Try to match postgres:// or postgresql:// format with port
+    
     let match = url.match(/postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
     if (match) {
       return {
@@ -56,15 +56,15 @@ function parseDatabaseUrl(url) {
         database: match[5]
       };
     }
-    // Try to match format without port (like Neon)
+    
     match = url.match(/postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^/]+)\/(.+)/);
     if (match) {
-      const databasePart = match[4].split('?')[0]; // Remove query params if any
+      const databasePart = match[4].split('?')[0]; 
       return {
         user: decodeURIComponent(match[1]),
         password: decodeURIComponent(match[2]),
         host: match[3],
-        port: 5432, // Default PostgreSQL port
+        port: 5432, 
         database: databasePart
       };
     }
@@ -76,7 +76,7 @@ function parseDatabaseUrl(url) {
 
 const dbParams = parseDatabaseUrl(process.env.DATABASE_URL);
 
-// PostgreSQL Database connection
+
 const pool = new Pool(dbParams ? {
   host: dbParams.host,
   port: dbParams.port,
@@ -93,14 +93,14 @@ const pool = new Pool(dbParams ? {
   }
 });
 
-// Test database connection and initialize tables
+
 const initDatabase = async () => {
   try {
-    // Test the connection
+    
     const client = await pool.connect();
     console.log('✅ Connected to Neon database');
     
-    // Create users table
+    
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -196,6 +196,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/bookings', require('./routes/bookings'));
+app.use('/api/send-package', require('./routes/send-package'));
 
 // Test email endpoint
 app.get('/api/test-email', async (req, res) => {
@@ -246,3 +247,4 @@ process.on('SIGTERM', async () => {
 });
 
 module.exports = app;
+  

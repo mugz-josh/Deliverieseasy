@@ -1,11 +1,18 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+console.log('🔍 Debug: DATABASE_URL is', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+
+if (process.env.DATABASE_URL) {
+  console.log('🔍 Debug: First 50 chars:', process.env.DATABASE_URL.substring(0, 50));
+}
+
 // Parse DATABASE_URL to extract connection parameters
 // Format: postgres://username:password@host:port/database
 function parseDatabaseUrl(url) {
   try {
-    const match = url.match(/postgres:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
+    // Try format with port: postgres://user:pass@host:port/db
+    let match = url.match(/postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
     if (match) {
       return {
         user: decodeURIComponent(match[1]),
@@ -15,6 +22,20 @@ function parseDatabaseUrl(url) {
         database: match[5]
       };
     }
+    // Try format without port (like Neon): postgres://user:pass@host/db
+    match = url.match(/postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^/]+)\/(.+)/);
+    if (match) {
+      const databasePart = match[4].split('?')[0];
+      return {
+        user: decodeURIComponent(match[1]),
+        password: decodeURIComponent(match[2]),
+        host: match[3],
+        port: 5432,
+        database: databasePart
+      };
+    }
+    console.log('⚠️ Could not parse DATABASE_URL format');
+    return null;
   } catch (err) {
     console.error('Error parsing DATABASE_URL:', err.message);
   }
@@ -22,6 +43,8 @@ function parseDatabaseUrl(url) {
 }
 
 const dbParams = parseDatabaseUrl(process.env.DATABASE_URL);
+
+console.log('🔍 Debug: Parsed params:', dbParams);
 
 const pool = new Pool(dbParams ? {
   host: dbParams.host,
@@ -46,12 +69,18 @@ if (!process.env.DATABASE_URL) {
   output += '❌ ERROR: DATABASE_URL is not set!\n';
   output += 'Please create a .env file in the backend folder and add:\n';
   output += 'DATABASE_URL=postgresql://username:password@host.neon.tech/dbname?sslmode=require\n\n';
+  output += 'Or get your connection string from Neon dashboard:\n';
+  output += '1. Go to https://neon.tech\n';
+  output += '2. Select your project\n';
+  output += '3. Go to Connection Details\n';
+  output += '4. Copy the "Connection string"\n';
   console.log(output);
   process.exit(1);
 }
 
 async function testConnection() {
   try {
+    console.log('🔄 Attempting to connect to database...');
     const client = await pool.connect();
     const result = await client.query('SELECT NOW() as current_time, version() as pg_version');
     
@@ -65,7 +94,6 @@ async function testConnection() {
     output += '❌ FAILED! Could not connect to Neon database\n';
     output += 'Error: ' + err.message + '\n\n';
     
-    // Provide helpful troubleshooting tips based on the error
     if (err.message.includes('ENOTFOUND')) {
       output += '🔧 TROUBLESHOOTING:\n';
       output += 'The database hostname could not be resolved.\n';
