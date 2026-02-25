@@ -22,6 +22,9 @@ app.use(cors({
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:3003',
+      'http://192.168.100.16:3002',
       'https://deliveries-app-v1o9.vercel.app',
       'https://deliveries-app.vercel.app',
       'https://safe-app-woad.vercel.app',
@@ -29,13 +32,22 @@ app.use(cors({
       'https://safe-cbzxpy50p-mugisha-joshuas-projects.vercel.app'
     ];
     
+    // Allow all localhost origins and Vercel deployments
+    if (origin.startsWith('http://localhost:') || origin.startsWith('https://') && origin.includes('vercel.app')) {
+      return callback(null, true);
+    }
+    
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // Instead of blocking, just log and allow for development
+      console.log(`CORS origin ${origin} not in allowed list, but allowing for development`);
+      callback(null, true);
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(morgan('combined'));
 app.use(express.json()); 
